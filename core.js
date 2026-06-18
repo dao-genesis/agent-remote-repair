@@ -26,14 +26,30 @@ const { execFile } = require("child_process");
 const IS_WIN = process.platform === "win32";
 
 // ── 本机执行任意命令（被控端模型在"中枢自己这台"上的等价实现）──
+// Windows 下与 bootstrap 被控端同源语义：
+//   ① 强制 UTF-8 输出编码 — 否则 powershell.exe 默认按 OEM 码页写管道，
+//      中文/非 ASCII 输出全成 "?"（中文 Windows 操控本机的本源场景必坏）。
+//   ② 退出码透传 — `powershell -Command` 默认只返回 0/1，吞掉原生进程退出码；
+//      故末尾按 $LASTEXITCODE(原生码优先) → $Error(cmdlet 非终止错误=1) → 0 显式 exit。
+function wrapPwshForUtf8AndExit(cmd) {
+  return (
+    "$OutputEncoding=[Console]::OutputEncoding=[Text.Encoding]::UTF8\n" +
+    "$ErrorActionPreference='Continue'; $Error.Clear(); $global:LASTEXITCODE=0\n" +
+    cmd +
+    "\n$__c=0; if($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0){$__c=$LASTEXITCODE} elseif($Error.Count -gt 0){$__c=1}; exit $__c"
+  );
+}
+
 function runShell(cmd, cwd, timeoutMs) {
   return new Promise((resolve) => {
     const shell = IS_WIN ? "powershell.exe" : "/bin/sh";
-    const args = IS_WIN ? ["-NoProfile", "-Command", cmd] : ["-c", cmd];
+    const args = IS_WIN
+      ? ["-NoProfile", "-Command", wrapPwshForUtf8AndExit(cmd)]
+      : ["-c", cmd];
     execFile(
       shell,
       args,
-      { cwd, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+      { cwd, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true, encoding: "utf8" },
       (err, stdout, stderr) => {
         resolve({
           stdout: stdout || "",

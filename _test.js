@@ -57,6 +57,17 @@ function api(base, method, p, body, token) {
   const self = await api(BASE, "POST", "/api/exec-sync", { agent_id: "", cmd: process.platform === "win32" ? "echo self-ok" : "echo self-ok" }, TOKEN);
   ok("exec-sync SELF runs on hub", self.status === 200 && self.json.result.stdout.includes("self-ok"));
 
+  // SELF 路径回归（仅 Windows）：UTF-8 输出 + 原生退出码透传
+  if (process.platform === "win32") {
+    const u8 = await api(BASE, "POST", "/api/exec-sync", { agent_id: "", cmd: 'Write-Output "中文-道法自然"', timeout: 20 }, TOKEN);
+    ok("SELF preserves UTF-8 (中文 not ?)", u8.status === 200 && u8.json.result.stdout.includes("中文") && !u8.json.result.stdout.includes("?"));
+    const ec = await api(BASE, "POST", "/api/exec-sync", { agent_id: "", cmd: "cmd /c exit 7", timeout: 20 }, TOKEN);
+    ok("SELF propagates native exit code 7", ec.status === 200 && ec.json.result.exit_code === 7);
+  } else {
+    ok("SELF utf8/exit (skipped: non-win)", true);
+    ok("SELF exit-code (skipped: non-win)", true);
+  }
+
   // 被控端注册
   const reg = (await api(BASE, "POST", "/api/connect", { sysinfo: { hostname: "TEST-PC", username: "t", os_version: "X", capabilities: ["shell"] } })).json;
   ok("connect returns agent_id + token", !!reg.agent_id && !!reg.token);
