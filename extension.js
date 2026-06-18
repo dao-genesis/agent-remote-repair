@@ -15,7 +15,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const { Hub, startServer, connectRelay, buildBootstrap } = require("./core");
-const tunnel = require("./remote-agent/dao_tunnel");
+const tunnel = require("./tunnel");
 
 const pkg = (() => {
   try {
@@ -96,8 +96,9 @@ async function startHub() {
   const port = Number(c.get("port")) || Number(process.env.PORT) || 3002;
   const noTunnel = !!c.get("lanOnly") || process.env.NO_TUNNEL === "1";
   const relayUrl = String(c.get("relayUrl") || process.env.DAO_RELAY_URL || "");
+  const aliases = c.get("aliases") || undefined;
 
-  hub = new Hub({ token, version: pkg.version, root: os.homedir() });
+  hub = new Hub({ token, version: pkg.version, root: os.homedir(), aliases });
   serverHandle = await startServer(hub, { port, bind: "0.0.0.0" });
   saveConn({ token: hub.token, session, port: hub.port, updated: new Date().toISOString() });
   log("HTTP server 已监听 " + localUrl());

@@ -18,7 +18,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const { Hub, startServer, connectRelay } = require("./core");
-const tunnel = require("./remote-agent/dao_tunnel");
+const tunnel = require("./tunnel");
 
 const pkg = (() => {
   try {

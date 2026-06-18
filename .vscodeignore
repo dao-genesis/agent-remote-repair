@@ -5,7 +5,6 @@ install.ps1
 install.sh
 .env.example
 _AGENTS.md
-ps-agent/**
 
 # 版本库 / 工具配置
 .git/**

@@ -15,7 +15,17 @@
 被控端 (任意机器, 一行 PowerShell)                  ← irm <隧道>/api/bootstrap.ps1 | iex
 ```
 
-## 一行启动
+## 安装（VS Code 类编辑器 — 最终产出 · 去中心化）
+
+本仓库以**这一个扩展**为核心产出。只用标准 VS Code 扩展 API，**任意 VS Code 类编辑器**皆可无缝使用：VS Code、Cursor、Windsurf、VSCodium、code-server 等（`engines.vscode ^1.74.0`）。
+
+```bash
+npx @vscode/vsce package          # 产出 .vsix
+```
+
+在编辑器里 `Extensions: Install from VSIX…` 选择该 `.vsix` 即可。激活后**中枢=本编辑器**（去中心化：每个安装即自有中枢，默认零外部服务器），状态栏显示 `本地:<port> · N 被控端`，命令面板搜 `DAO` 见 7 个命令。被控端短名映射用设置 `daoRemote.aliases`（软编码，无写死值）。
+
+## 一行启动（CLI 孪生，可选）
 
 ### 中枢（操作端做中枢，本源端）
 
@@ -91,17 +101,16 @@ print(api("POST","/api/exec-sync",{"agent_id":"","cmd":"whoami"}))   # 中枢本
 | `--lan-only` / `DAO_LAN_ONLY=1` | 仅局域网 |
 | `DAO_TOKEN` | 指定 master token（默认随机并持久化到 `~/.dao-remote/conn.json`）|
 | `DAO_RELAY_URL` | 走 Worker+DurableObject 稳定隧道（`*.workers.dev`），否则默认 cloudflared 透明隧道 |
-| `DAO_ALIASES` | 被控端短名映射，如 `{"141":"DESKTOP-MASTER"}` |
+| `DAO_ALIASES` | 被控端短名映射（软编码，无写死值），如 `{"laptop":"MY-PC"}`；插件内亦可用设置 `daoRemote.aliases` |
 
 ## 架构与源码
 
 | 文件 | 角色 |
 |---|---|
+| `extension.js` | **最终产出** — VS Code 类编辑器扩展：激活即中枢=本编辑器，状态栏 + 7 命令，零中心、零配置 |
 | `core.js` | **本源核心** — Hub（agent 注册表 + 队列/轮询/结果 + agent_id 路由）、统一路由、本机 HTTP server、relay 桥、`/api/bootstrap.ps1` |
-| `dao.js` | 极简入口 — 起 server + 隧道 + 打印/落盘接入文档 |
-| `remote-agent/dao_tunnel.js` | 出站隧道（cloudflared → ngrok → SSH 自适应，自动下载，零配置）|
-| `ps-agent/ps_agent_client.ps1` | 被控端全能客户端（21 类能力：shell/截屏/进程/注册表/服务/网络…），可替代 bootstrap 跑富功能 |
-| `ps-agent/ps_agent_server.py` | 本源参考 — 原版纯 Python 中枢（独立运行，与 core.js 等价）|
+| `tunnel.js` | 出站隧道（cloudflared → ngrok → SSH 自适应，自动下载，零配置）|
+| `dao.js` | 极简 CLI 孪生 — `node dao.js` 起 server + 隧道 + 打印/落盘接入文档（与扩展同源 core）|
 
 ## 自检
 

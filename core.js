@@ -81,11 +81,15 @@ class Hub {
     this.tunnelMethod = "";
     this.version = opts.version || "1.0.0";
     this.agents = new Map(); // id -> AgentInfo
-    // 别名：人记得住的短名 → 真 hostname。env 可扩展。
-    this.aliases = Object.assign(
-      { 141: "DESKTOP-MASTER", desktop: "DESKTOP-MASTER", 179: "ZHOUMAC", laptop: "ZHOUMAC" },
-      safeJson(process.env.DAO_ALIASES) || {},
-    );
+    // 别名：人记得住的短名 → 真 hostname。纯配置驱动，无任何写死值。
+    //   优先级：opts.aliases(IDE 设置) > DAO_ALIASES(env)。键名大小写不敏感。
+    this.aliases = {};
+    const addAliases = (obj) => {
+      if (!obj || typeof obj !== "object") return;
+      for (const k of Object.keys(obj)) this.aliases[String(k).toLowerCase().trim()] = obj[k];
+    };
+    addAliases(safeJson(process.env.DAO_ALIASES));
+    addAliases(opts.aliases);
     this.HEARTBEAT_TIMEOUT = 120 * 1000;
     this.POLL_MAX = 28; // < cloudflared/relay 单连超时，留余量
   }
@@ -93,7 +97,7 @@ class Hub {
   resolveAlias(name) {
     if (!name) return "";
     const k = String(name).toLowerCase().trim();
-    return this.aliases[k] || this.aliases[name] || name;
+    return this.aliases[k] || name;
   }
 
   // 被控端登记（开放：被控端"主动献出自己"，登记本身不授予任何操控权）

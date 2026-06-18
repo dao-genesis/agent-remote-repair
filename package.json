@@ -5,11 +5,21 @@
   "description": "道 · 远程中枢 — 三明治架构: 操控端(云/本地 Agent) → 中枢(本插件+出站隧道) → 被控端(一行 PowerShell)。大道至简·零配置·零费用",
   "publisher": "dao",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.74.0"
   },
   "categories": [
     "Other"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "中枢行为不依赖工作区文件内容，可在不受信任工作区运行。"
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "需本地文件系统与本地进程（HTTP 中枢/隧道），不支持纯虚拟工作区。"
+    }
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -69,6 +79,14 @@
           "type": "string",
           "default": "",
           "description": "（可选）Worker+DO 中继端点；留空走 cloudflared 快速隧道"
+        },
+        "daoRemote.aliases": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "被控端短名 → 真实主机名 的映射（软编码，键名大小写不敏感）。例：`{ \"laptop\": \"MY-PC\" }`。亦可用环境变量 `DAO_ALIASES`（JSON）。"
         }
       }
     }

@@ -1,12 +1,5 @@
-# Dependencies (root node_modules only — remote-agent uses root deps)
+# Dependencies
 node_modules/
-remote-agent/node_modules/
-__pycache__/
-*.pyc
-
-# Build artifacts
-web/.next/
-web/out/
 
 # Environment & secrets (never commit real tokens)
 .env
@@ -17,9 +10,6 @@ frpc.toml
 start_service.bat
 *.local.bat
 *.local.toml
-
-# PS Agent state (runtime)
-ps-agent/dao_state.json
 
 # System
 .DS_Store
@@ -32,9 +22,6 @@ _dao_*.txt
 # IDE
 .vscode/
 .idea/
-
-# Windsurf
-web/windsurf_deployment.yaml
 
 # Dao Kernel identity (per-device keypair, never share)
 .dao-remote/

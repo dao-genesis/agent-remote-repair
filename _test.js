@@ -68,6 +68,12 @@ function api(base, method, p, body, token) {
     ok("SELF exit-code (skipped: non-win)", true);
   }
 
+  // 软编码回归：默认无任何写死别名；opts/env 驱动且大小写不敏感
+  const plainHub = new Hub({ token: "t" });
+  ok("no hardcoded aliases by default", Object.keys(plainHub.aliases).length === 0 && plainHub.resolveAlias("desktop") === "desktop");
+  const aliasHub = new Hub({ token: "t", aliases: { Laptop: "MY-PC" } });
+  ok("aliases resolve case-insensitively", aliasHub.resolveAlias("laptop") === "MY-PC" && aliasHub.resolveAlias("LAPTOP") === "MY-PC");
+
   // 被控端注册
   const reg = (await api(BASE, "POST", "/api/connect", { sysinfo: { hostname: "TEST-PC", username: "t", os_version: "X", capabilities: ["shell"] } })).json;
   ok("connect returns agent_id + token", !!reg.agent_id && !!reg.token);

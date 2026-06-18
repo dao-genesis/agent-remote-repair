@@ -25,7 +25,7 @@ let _localPort = 0;
 // 二进制探测 — 道法自然: 有什么用什么, 不假设任何存在
 // ═══════════════════════════════════════════════════════════
 
-var _projectRoot = path.join(__dirname, "..");
+var _projectRoot = __dirname;
 
 function _findBinary(name) {
   var isWin = process.platform === "win32";
@@ -40,7 +40,7 @@ function _findBinary(name) {
     }).trim();
     if (result) return result.split("\n")[0].trim();
   } catch (e) {}
-  // Local directory (project root + remote-agent)
+  // Local directory (project root)
   var local = path.join(_projectRoot, exe);
   try {
     if (fs.existsSync(local) && fs.statSync(local).size > 100000) return local;
