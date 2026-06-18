@@ -9,7 +9,7 @@
 操控端 (你 / 云端·本地 Devin Agent, REST)
         │  POST /api/exec-sync {agent_id, cmd}      ← agent_id 选目标，空=中枢自己
         ▼
-中枢 (本进程 + 出站隧道 = 唯一公网入口)              ← node dao.js
+中枢 (编辑器插件 + 出站隧道 = 唯一公网入口)          ← VS Code 扩展（CLI: node dao.js 为同源孪生）
         │  命令队列 + 长轮询 + 结果回填
         ▼
 被控端 (任意机器, 一行 PowerShell)                  ← irm <隧道>/api/bootstrap.ps1 | iex
@@ -113,6 +113,10 @@ print(api("POST","/api/exec-sync",{"agent_id":"","cmd":"whoami"}))   # 中枢本
 | `core.js` | **本源核心** — Hub（agent 注册表 + 队列/轮询/结果 + agent_id 路由）、统一路由、本机 HTTP server、relay 桥、`/api/bootstrap.ps1` |
 | `tunnel.js` | 出站隧道（cloudflared → ngrok → SSH 自适应，自动下载，零配置）|
 | `dao.js` | 极简 CLI 孪生 — `node dao.js` 起 server + 隧道 + 打印/落盘接入文档（与扩展同源 core）|
+
+## 源流 · 取之精之（正本清源）
+
+本仓库是内网穿透 **dao-bridge** 多模块原型的**蒸馏产物**：只取其「道」——出站长轮询 + `cmd_id` 关联 + 一行 `irm|iex` 接入——沉淀进 `core.js` / `tunnel.js`，由 `extension.js` 收口为**单一编辑器插件**。原型中的 mDNS / NAT 打洞 / 配对 / 网络唤醒 / 录屏 / Web 面板 / Python 端等枝节一律**去芜存清**，需要时再按需生长。少则得，大道至简。
 
 ## 自检
 
