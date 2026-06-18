@@ -19,6 +19,10 @@
 
 本仓库以**这一个扩展**为核心产出。只用标准 VS Code 扩展 API，**任意 VS Code 类编辑器**皆可无缝使用：VS Code、Cursor、Windsurf、VSCodium、code-server 等（`engines.vscode ^1.74.0`）。
 
+**① 直接下载（推荐）**：到 [Releases](https://github.com/zhouyoukang1234-spec/agent-remote-repair/releases) 下载最新 `agent-remote-repair-*.vsix`。
+
+**② 自行打包**：
+
 ```bash
 npx @vscode/vsce package          # 产出 .vsix
 ```
