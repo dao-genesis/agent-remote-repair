@@ -25,7 +25,7 @@ let _localPort = 0;
 // 二进制探测 — 道法自然: 有什么用什么, 不假设任何存在
 // ═══════════════════════════════════════════════════════════
 
-var _projectRoot = path.join(__dirname, "..");
+var _projectRoot = __dirname;
 
 function _findBinary(name) {
   var isWin = process.platform === "win32";
@@ -40,7 +40,7 @@ function _findBinary(name) {
     }).trim();
     if (result) return result.split("\n")[0].trim();
   } catch (e) {}
-  // Local directory (project root + remote-agent)
+  // Local directory (project root)
   var local = path.join(_projectRoot, exe);
   try {
     if (fs.existsSync(local) && fs.statSync(local).size > 100000) return local;
@@ -325,9 +325,12 @@ function _startCloudflared(localPort, cfPath) {
   _tunnelMethod = "cloudflared";
   console.log("[tunnel:cloudflared] Starting quick tunnel → :" + localPort);
 
+  // 道法自然: 默认 http2 — 兼容封禁 UDP/QUIC 的网络(企业/校园/部分云)。
+  // 需要 quic 可设 DAO_CF_PROTOCOL=quic 覆盖。
+  var proto = process.env.DAO_CF_PROTOCOL || "http2";
   _tunnelProcess = spawn(
     cfPath,
-    ["tunnel", "--url", "http://localhost:" + localPort, "--no-autoupdate"],
+    ["tunnel", "--url", "http://localhost:" + localPort, "--no-autoupdate", "--protocol", proto],
     { stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
   );
 

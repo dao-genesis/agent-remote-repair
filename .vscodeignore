@@ -1,0 +1,19 @@
+# 测试 / 开发期文件（不进 VSIX）
+_test.js
+_ext_test.js
+install.ps1
+install.sh
+.env.example
+_AGENTS.md
+
+# 版本库 / 工具配置
+.git/**
+.gitignore
+.vscode/**
+.vscode-test/**
+**/*.map
+
+# 运行期状态 / 产物
+.dao-remote/**
+*.vsix
+*.log

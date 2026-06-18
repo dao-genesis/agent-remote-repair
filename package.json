@@ -1,19 +1,117 @@
 {
   "name": "agent-remote-repair",
-  "version": "8.7.0",
-  "description": "道 · 远程诊断修复中枢 — Ed25519端到端·道核驱动·唯变所适·万法归宗",
-  "main": "dao.js",
+  "displayName": "DAO 远程中枢 · 三明治穿透",
+  "version": "9.0.0",
+  "description": "道 · 远程中枢 — 三明治架构: 操控端(云/本地 Agent) → 中枢(本插件+出站隧道) → 被控端(一行 PowerShell)。大道至简·零配置·零费用",
+  "publisher": "dao",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "中枢行为不依赖工作区文件内容，可在不受信任工作区运行。"
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "需本地文件系统与本地进程（HTTP 中枢/隧道），不支持纯虚拟工作区。"
+    }
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "bin": {
+    "dao": "dao.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhouyoukang1234-spec/agent-remote-repair"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "daoRemote.showPanel",
+        "title": "DAO 远程中枢: 打开中枢状态台"
+      },
+      {
+        "command": "daoRemote.start",
+        "title": "DAO 远程中枢: 启动"
+      },
+      {
+        "command": "daoRemote.stop",
+        "title": "DAO 远程中枢: 停止"
+      },
+      {
+        "command": "daoRemote.restart",
+        "title": "DAO 远程中枢: 重启隧道"
+      },
+      {
+        "command": "daoRemote.copyBootstrap",
+        "title": "DAO 远程中枢: 复制被控端一行接入指令"
+      },
+      {
+        "command": "daoRemote.copyToken",
+        "title": "DAO 远程中枢: 复制中枢 Token"
+      },
+      {
+        "command": "daoRemote.showInfo",
+        "title": "DAO 远程中枢: 查看接入信息"
+      },
+      {
+        "command": "daoRemote.showAgents",
+        "title": "DAO 远程中枢: 查看在线被控端"
+      }
+    ],
+    "configuration": {
+      "title": "DAO 远程中枢",
+      "properties": {
+        "daoRemote.port": {
+          "type": "number",
+          "default": 3002,
+          "description": "中枢本地 HTTP 端口（被占用自动顺延）"
+        },
+        "daoRemote.lanOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "仅本地/局域网，不开公网隧道"
+        },
+        "daoRemote.relayUrl": {
+          "type": "string",
+          "default": "",
+          "description": "（可选）Worker+DO 中继端点；留空走 cloudflared 快速隧道"
+        },
+        "daoRemote.aliases": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "被控端短名 → 真实主机名 的映射（软编码，键名大小写不敏感）。例：`{ \"laptop\": \"MY-PC\" }`。亦可用环境变量 `DAO_ALIASES`（JSON）。"
+        }
+      }
+    }
+  },
   "scripts": {
     "start": "node dao.js",
+    "start:lan": "node dao.js --lan-only",
     "start:no-tunnel": "node dao.js --no-tunnel",
-    "hub": "node remote-agent/server.js",
-    "relay": "python ps-agent/ps_agent_server.py",
-    "test": "node _test_wuwei.js && node _test_endpoints.js",
-    "test:unit": "node _test_wuwei.js",
-    "test:endpoints": "node _test_endpoints.js",
-    "postinstall": "node -e \"try{require('fs').rmSync('remote-agent/node_modules',{recursive:true,force:true})}catch(e){}\""
+    "test": "node _test.js && node _ext_test.js"
   },
-  "keywords": ["remote", "repair", "agent", "windows", "diagnostics", "dao", "zero-config", "zero-cost", "tunnel"],
+  "keywords": [
+    "remote",
+    "agent",
+    "powershell",
+    "tunnel",
+    "nat-traversal",
+    "dao",
+    "zero-config",
+    "zero-cost",
+    "sandwich-architecture"
+  ],
   "license": "MIT",
   "dependencies": {
     "ws": "^8.19.0"
