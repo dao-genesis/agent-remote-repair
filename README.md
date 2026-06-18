@@ -59,6 +59,7 @@ irm <中枢公网URL>/api/bootstrap.ps1 | iex
 | GET  | `/api/info` | - | 中枢信息 |
 | GET  | `/api/agents` | - | 在线被控端列表 |
 | POST | `/api/exec` | `{agent_id,cmd}` | 异步下发，返回 `cmd_id` |
+| GET  | `/api/result` | `?agent_id=&cmd_id=` | 取异步结果：`completed`+`result` 或 `pending` |
 | POST | `/api/exec-sync` | `{agent_id,cmd,timeout}` | 同步执行并等结果。`agent_id` 空/`self`/`local`/本机名 = **中枢自己这台** |
 | POST | `/api/broadcast` | `{cmd}` | 广播到所有被控端 |
 | POST | `/api/ls` `/api/read` `/api/write` | `{path,...}` | 中枢机文件操作（全机，修复中枢用）|

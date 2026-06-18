@@ -288,6 +288,15 @@ async function handleRoute(hub, route, method, headers, query, bodyRaw) {
   if (route === "/api/info" && method === "GET") return { status: 200, body: hub.info() };
   if (route === "/api/agents" && method === "GET") return { status: 200, body: { agents: hub.agentList() } };
 
+  // 操控端取异步结果：/api/exec 返回 cmd_id 后，凭此拉取（含 broadcast 各路结果）
+  if (route === "/api/result" && method === "GET") {
+    const a = hub.getAgent(hub.resolveAlias(q.agent_id));
+    if (!a) return { status: 404, body: { error: "agent not found" } };
+    const r = a.results.get(q.cmd_id);
+    if (!r) return { status: 200, body: { status: "pending", agent_id: a.id, cmd_id: q.cmd_id } };
+    return { status: 200, body: { status: "completed", agent_id: a.id, cmd_id: q.cmd_id, result: r } };
+  }
+
   // 命令执行 — 按 agent_id 路由：self → 本机；否则 → 入队转发被控端
   if ((route === "/api/exec" || route === "/api/exec-sync") && method === "POST") {
     const sync = route === "/api/exec-sync";
@@ -364,9 +373,12 @@ function buildBootstrap(hubUrl) {
   hubUrl = (hubUrl || "").replace(/\/$/, "");
   return `# dao 被控端 · 一行接入 · 道生一，一命接万机
 $ErrorActionPreference='SilentlyContinue'; $ProgressPreference='SilentlyContinue'
+try{ $OutputEncoding=[Console]::OutputEncoding=[Text.Encoding]::UTF8 }catch{}   # 中文 Windows 输出/回传统一 UTF-8
 $U='${hubUrl}'
+# 以 UTF-8 字节体 POST：PS5.1 默认按 ANSI 编码字符串体 → 非 ASCII 乱码且可能令中枢 JSON.parse 失败丢结果
+function Dao-Post($path,$obj){ $b=[Text.Encoding]::UTF8.GetBytes(($obj|ConvertTo-Json -Depth 8 -Compress)); return irm "$U$path" -Method POST -Body $b -ContentType 'application/json; charset=utf-8' -TimeoutSec 30 }
 $sys=@{ hostname=$env:COMPUTERNAME; username=$env:USERNAME; os_version=[Environment]::OSVersion.VersionString; ps_version=$PSVersionTable.PSVersion.ToString(); capabilities=@('shell') }
-try { $reg = irm "$U/api/connect" -Method POST -Body (@{sysinfo=$sys}|ConvertTo-Json -Depth 5) -ContentType 'application/json' -TimeoutSec 15 } catch { Write-Host "[dao] connect failed: $($_.Exception.Message)" -ForegroundColor Red; return }
+try { $reg = Dao-Post '/api/connect' @{sysinfo=$sys} } catch { Write-Host "[dao] connect failed: $($_.Exception.Message)" -ForegroundColor Red; return }
 $aid=$reg.agent_id; $tok=$reg.token
 Write-Host "[dao] 已接入中枢 as $aid  (Ctrl+C 退出)" -ForegroundColor Green
 while($true){
@@ -376,20 +388,34 @@ while($true){
       if(-not $c){ continue }
       $out=''; $err=''; $code=0
       $sw=[Diagnostics.Stopwatch]::StartNew()
+      $global:LASTEXITCODE=0
       try{
         switch($c.type){
-          'shell' { $out = (Invoke-Expression $c.payload.command 2>&1 | Out-String) }
           'sysinfo' { $out = (Get-ComputerInfo | Out-String) }
-          default { $out = (Invoke-Expression $c.payload.command 2>&1 | Out-String) }
+          default {
+            # 修复工具要看见错误。本版 PS 下 2>&1 不收编 cmdlet 非终止错误且 $? 不可靠,
+            # 故清空 $Error → 跑命令 → 用 $Error 判定失败并把错误文本补进输出。
+            $Error.Clear()
+            $ErrorActionPreference='Continue'
+            $raw = Invoke-Expression $c.payload.command 2>&1
+            $ErrorActionPreference='SilentlyContinue'
+            $out = ($raw | Out-String)
+            if($Error.Count -gt 0){
+              $code=1
+              $msgs = (@($Error | Select-Object -First 20) | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+              if([string]::IsNullOrWhiteSpace($out)){ $out=$msgs } else { $out = $out + [Environment]::NewLine + $msgs }
+            }
+            if($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0){ $code=$LASTEXITCODE }
+          }
         }
       }catch{ $err=$_.Exception.Message; $code=1 }
       $sw.Stop()
       $res=@{ stdout=$out; stderr=$err; exit_code=$code; execution_time_ms=$sw.ElapsedMilliseconds }
-      try{ irm "$U/api/result" -Method POST -Body (@{agent_id=$aid;token=$tok;cmd_id=$c.cmd_id;result=$res}|ConvertTo-Json -Depth 8) -ContentType 'application/json' -TimeoutSec 30 | Out-Null }catch{}
+      try{ Dao-Post '/api/result' @{agent_id=$aid;token=$tok;cmd_id=$c.cmd_id;result=$res} | Out-Null }catch{}
     }
   }catch{
     # token 失效（中枢重启）→ 重注册
-    try{ $reg = irm "$U/api/connect" -Method POST -Body (@{sysinfo=$sys}|ConvertTo-Json -Depth 5) -ContentType 'application/json' -TimeoutSec 15; $aid=$reg.agent_id; $tok=$reg.token }catch{ Start-Sleep 3 }
+    try{ $reg = Dao-Post '/api/connect' @{sysinfo=$sys}; $aid=$reg.agent_id; $tok=$reg.token }catch{ Start-Sleep 3 }
   }
 }
 `;
@@ -438,7 +464,7 @@ async function startServer(hub, opts) {
           res.writeHead(out.status, { "Content-Type": out.contentType || "text/plain; charset=utf-8" });
           res.end(out.raw);
         } else {
-          res.writeHead(out.status, { "Content-Type": "application/json" });
+          res.writeHead(out.status, { "Content-Type": "application/json; charset=utf-8" });
           res.end(JSON.stringify(out.body, null, 2));
         }
       } catch (e) {

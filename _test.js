@@ -86,6 +86,15 @@ function api(base, method, p, body, token) {
   const unknown = await api(BASE, "POST", "/api/exec-sync", { agent_id: "no-such-agent", cmd: "x", timeout: 2 }, TOKEN);
   ok("exec-sync to unknown agent → 404", unknown.status === 404);
 
+  // 异步 exec → cmd_id → GET /api/result 拉取
+  const async1 = await api(BASE, "POST", "/api/exec", { agent_id: "TEST-PC", cmd: "Get-Date" }, TOKEN);
+  ok("async exec returns cmd_id", async1.status === 200 && !!async1.json.cmd_id);
+  await new Promise((r) => setTimeout(r, 150));
+  const fetched = await api(BASE, "GET", `/api/result?agent_id=TEST-PC&cmd_id=${async1.json.cmd_id}`, null, TOKEN);
+  ok("GET /api/result fetches async result", fetched.status === 200 && fetched.json.status === "completed" && fetched.json.result.stdout.includes("TEST-PC ran: Get-Date"));
+  const pendingFetch = await api(BASE, "GET", `/api/result?agent_id=TEST-PC&cmd_id=cmd_never`, null, TOKEN);
+  ok("GET /api/result unknown cmd_id → pending", pendingFetch.status === 200 && pendingFetch.json.status === "pending");
+
   const bc = await api(BASE, "POST", "/api/broadcast", { cmd: "whoami" }, TOKEN);
   ok("broadcast delivers to agents", bc.json.ok && bc.json.delivered.length === 1);
 
