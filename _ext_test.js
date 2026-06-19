@@ -240,6 +240,52 @@ function api(base, method, p, body, token) {
   ext.deactivate();
   vscodeMock.extensions.all = [];
 
+  // ── 自愈看门狗：回环自检 + 失败阈值触发自愈 ──
+  {
+    const wd = new Bridge({ subscriptions: [] });
+    // 打桩 start：记录调用、模拟重连后 URL 稳定
+    let starts = 0;
+    wd.start = async function () { starts++; this.url = "https://stable.example/relay/host"; return this.url; };
+    wd._wdThreshold = 2;
+    // 自检失败：累计失败，达到阈值触发自愈(start 被调用、失败计数清零)
+    wd._publicHealthCheck = async () => false;
+    wd.url = "https://x";
+    await wd._wdTick();
+    ok("看门狗：自检失败累计 healthFails=1 未达阈值不自愈", wd._healthFails === 1 && starts === 0);
+    await wd._wdTick();
+    ok("看门狗：连续失败达阈值→自动自愈(start 调用、计数清零)", starts === 1 && wd._healthFails === 0);
+    // 自检成功：失败计数清零、记录 lastOkAt
+    wd._publicHealthCheck = async () => true;
+    wd._healthFails = 5;
+    await wd._wdTick();
+    ok("看门狗：自检成功→healthFails 清零并记录 lastOkAt", wd._healthFails === 0 && wd._lastOkAt > 0);
+    // startWatchdog/stopWatchdog 幂等且可停
+    wd.startWatchdog(); const h1 = wd._wd; wd.startWatchdog();
+    ok("看门狗：startWatchdog 幂等(不重复 arm)", wd._wd === h1 && !!wd._wd);
+    wd.stopWatchdog();
+    ok("看门狗：stopWatchdog 停表", wd._wd === null);
+  }
+
+  // ── 回环自检 _publicHealthCheck：透明反代直打 + relay 信封 + 错误识别 ──
+  {
+    const wd = new Bridge({ subscriptions: [] });
+    // 直连(透明反代) 模式：GET /api/health 200 ok
+    const okSrv = http.createServer((req, res) => { res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ status: "ok", service: "dao" })); });
+    await new Promise((r) => okSrv.listen(0, r));
+    wd.mode = "quick"; wd.url = "http://127.0.0.1:" + okSrv.address().port;
+    ok("回环自检：透明反代 /api/health 200→true", (await wd._publicHealthCheck()) === true);
+    okSrv.close();
+    // relay 模式：POST 信封，返回 {error} 视为不可达
+    const errSrv = http.createServer((req, res) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "no_agent" })); }); });
+    await new Promise((r) => errSrv.listen(0, r));
+    wd.mode = "relay"; wd.url = "http://127.0.0.1:" + errSrv.address().port + "/relay/host";
+    ok("回环自检：relay 信封返回 {error}→false(识破僵尸)", (await wd._publicHealthCheck()) === false);
+    errSrv.close();
+    // 无 URL → false
+    wd.url = "";
+    ok("回环自检：无公网 URL→false", (await wd._publicHealthCheck()) === false);
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   Module._load = origLoad;
   process.exit(fail ? 1 : 0);
