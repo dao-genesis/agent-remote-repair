@@ -84,7 +84,8 @@
     "start": "node dao.js",
     "start:lan": "node dao.js --lan-only",
     "start:no-tunnel": "node dao.js --no-tunnel",
-    "test": "node _test.js && node _ext_test.js"
+    "test": "node _test.js && node _ext_test.js",
+    "package": "npx --yes @vscode/vsce@latest package --allow-star-activation --no-dependencies"
   },
   "keywords": [
     "remote",

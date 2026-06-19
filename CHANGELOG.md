@@ -25,6 +25,12 @@
 
 测试：`npm test` 63/63（31 core + 32 ext），含中枢本机**真实 `.bat` 实跑 + 原生退出码**、`cmd` 类型 UTF-8 回传、`run`/`detached` 表达式构造与端到端路由。
 
+### 工程化（CI / 自动化 PR / 自动发布）
+- **`ci.yml`**：每个 PR / push 到 `main` 在 **windows-latest** 跑 `npm test`（含真实 `.bat` 实跑），给出 `test` 状态检查。
+- **`auto-merge.yml`**：CI 跑完（`workflow_run`）或 PR 开/更/重开/转就绪/定时扫描时，自动合并 **base=main、非草稿、同仓库、无冲突且 CI 通过** 的 PR；合并后显式 dispatch `release.yml`。
+- **`release.yml`**：push 到 `main`（命中代码/版本/CHANGELOG）或手动触发时，先跑测试 → `vsce` 打 VSIX → 按 `package.json` 版本建 GitHub Release（附 VSIX + 取自 `CHANGELOG.md` 的发布说明），同名 tag 已存在则幂等跳过。
+- README 补全：新增「远程运行 `.bat`/`.cmd`/`.exe`」exec 类型表与示例、「持续集成与自动发布」一节；修正命令数（6 个 `daoBridgeHub.*`）与打包命令参数。
+
 ## [9.3.0] - 2026-06-18
 
 从根本底层规避一切插件并存冲突。此前合并自本源 dao-bridge 时，沿用了与遗留 `dao.dao-bridge` 插件**完全相同**的贡献标识（活动栏容器 `daoBridge` / 视图 `daoBridgeView` / 命令 `daoBridge.*`）。一旦两插件同时安装，二者抢注同一 `registerWebviewViewProvider("daoBridgeView")` 与同名命令，后注册者抛错中断激活 → webview 的 `onDidReceiveMessage` 没挂上 → 面板按钮点不动、输入框打不了字（"没法写字"）。
