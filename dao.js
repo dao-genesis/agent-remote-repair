@@ -17,7 +17,7 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 
-const { Hub, startServer, connectRelay, buildCloudDoc } = require("./core");
+const { Hub, startServer, buildCloudDoc } = require("./core");
 const tunnel = require("./tunnel");
 
 const pkg = (() => {
@@ -37,7 +37,6 @@ function argVal(flag) {
   return i >= 0 && ARGV[i + 1] ? ARGV[i + 1] : "";
 }
 const PORT = parseInt(argVal("--port") || process.env.PORT || "3002", 10);
-const RELAY_URL = process.env.DAO_RELAY_URL || ""; // 设了则走 Worker+DO 稳定隧道
 
 // ── 凭证持久化：token 跨重启稳定（操控端保存的 token 不失效）──
 const CONN_DIR = path.join(os.homedir(), ".dao-remote");
@@ -91,31 +90,22 @@ function banner() {
   await startServer(hub, { port: PORT, bind: "0.0.0.0" });
   saveConn({ token: hub.token, session: SESSION, port: hub.port, updated: new Date().toISOString() });
 
-  // 出站隧道 — 反者道之动：本机主动出站到公网会合点
+  // 出站隧道 — 反者道之动：本机主动出站到 Cloudflare 快速隧道
   if (!NO_TUNNEL) {
-    if (RELAY_URL) {
-      hub.tunnelMethod = "relay";
-      connectRelay(hub, { relayUrl: RELAY_URL, sessionId: SESSION, token: hub.token });
-      setTimeout(() => {
+    tunnel.onUrl((u) => {
+      hub.publicUrl = u;
+      hub.tunnelMethod = tunnel.method || "cloudflared";
+      exportDoc();
+      banner();
+    });
+    tunnel.start(hub.port);
+    // 隧道未就绪也先出本地横幅
+    setTimeout(() => {
+      if (!hub.publicUrl) {
         exportDoc();
         banner();
-      }, 2500);
-    } else {
-      tunnel.onUrl((u) => {
-        hub.publicUrl = u;
-        hub.tunnelMethod = tunnel.method || "cloudflared";
-        exportDoc();
-        banner();
-      });
-      tunnel.start(hub.port);
-      // 隧道未就绪也先出本地横幅
-      setTimeout(() => {
-        if (!hub.publicUrl) {
-          exportDoc();
-          banner();
-        }
-      }, 1500);
-    }
+      }
+    }, 1500);
   } else {
     hub.tunnelMethod = "lan-only";
     exportDoc();

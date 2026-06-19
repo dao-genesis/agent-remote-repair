@@ -97,8 +97,5 @@
     "zero-config",
     "sandwich-architecture"
   ],
-  "license": "MIT",
-  "dependencies": {
-    "ws": "^8.19.0"
-  }
+  "license": "MIT"
 }
