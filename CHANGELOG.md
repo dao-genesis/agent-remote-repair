@@ -2,6 +2,21 @@
 
 本项目遵循语义化版本。日期格式 YYYY-MM-DD。
 
+## [9.5.0] - 2026-06-19
+
+侧栏「公网穿透状态」顶部按钮归一为三个：**复制 / 重启隧道 / 刷新Token**。
+
+### 变更
+- **合并 复制URL + 复制Token → 单一「📋 复制」**：一键把 `URL` 与 `Token`（含 `Authorization: Bearer <Token>` 头）一次性写入剪贴板，直接粘贴给云端 Agent 即可接入；新增后端 `copyAll` 处理（经 `data-op` 委托）。
+- 顶部行恒为三按钮（复制 / ♻️ 重启隧道 / 🔄 刷新Token），不再分两行。
+- 旧的 `copyUrl` / `copyToken` 后端处理保留（命令与向后兼容），仅从 UI 顶部移除。
+
+### 跨平台适配（Linux / macOS 中枢本机）
+- `buildExecCommand(body, targetPlatform)` 新增 POSIX 分支：中枢本机(SELF)按 `process.platform` 规范化——Linux/macOS 走 `/bin/sh`，Windows 仍走 PowerShell；被控端经 bootstrap 恒为 Windows(PowerShell) 不变。
+- `cmd` 类型在 *nix 无 `cmd.exe` → 降级为普通 shell 命令；`run/file` 用单引号量化(`.sh` 自动 `sh` 调用)；`detached` 用 `nohup … & echo "started pid=$!"`；`cwd` 用 `cd '<dir>' &&`。
+- `sysinfo` 按平台采集：Windows `Get-ComputerInfo`；Linux/macOS `uname`/`os-release`/`lscpu`/`free`/`df`。
+- 测试新增 POSIX 实跑用例（`.sh` 运行+退出码、cmd 降级、detached、sysinfo），Linux 全绿；Windows 原有断言不变。
+
 ## [9.4.0] - 2026-06-18
 
 从根本底层完善执行模块 —— 让被控端与中枢本机都能远程跑 `.bat`/`.cmd`/`.exe` 及任意程序，覆盖整台电脑。
