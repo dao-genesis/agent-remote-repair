@@ -8,6 +8,9 @@
 // ═══════════════════════════════════════════════════════════
 "use strict";
 const http = require("http");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 let pass = 0, fail = 0;
 function ok(name, cond) {
@@ -126,6 +129,12 @@ function api(base, method, p, body, token) {
   const bc = await api(BASE, "POST", "/api/broadcast", { cmd: "whoami" }, TOKEN);
   ok("broadcast 入队所有被控端", bc.status === 200 && Array.isArray(bc.json.delivered) && bc.json.delivered.some((d) => d.agent_id === "TEST-PC"));
 
+  // type:run → 被控端：payload.command 携带 & 调用运算符表达式（.bat/.exe 根本修复）
+  const routedRun = await api(BASE, "POST", "/api/exec-sync", { agent_id: "TEST-PC", type: "run", file: "C:\\tool\\x.bat", args: ["a"], timeout: 10 }, TOKEN);
+  ok("exec-sync run 转发 &-表达式到被控端", routedRun.status === 200 && routedRun.json.result.stdout.includes("& 'C:\\tool\\x.bat' 'a'"));
+  const routedCmd = await api(BASE, "POST", "/api/exec-sync", { agent_id: "TEST-PC", type: "cmd", cmd: "echo hi", timeout: 10 }, TOKEN);
+  ok("exec-sync cmd 转发 cmd.exe/chcp 到被控端", routedCmd.status === 200 && routedCmd.json.result.stdout.includes("cmd.exe /d /c") && routedCmd.json.result.stdout.includes("chcp 65001"));
+
   // 找不到的被控端
   const nf = await api(BASE, "POST", "/api/exec-sync", { agent_id: "NO-SUCH", cmd: "x", timeout: 3 }, TOKEN);
   ok("路由到不存在的被控端返回 404", nf.status === 404);
@@ -138,6 +147,14 @@ function api(base, method, p, body, token) {
     ok("SELF 保留 UTF-8（中文不乱码）", u8.status === 200 && u8.json.result.stdout.includes("中文") && !u8.json.result.stdout.includes("?"));
     const ec = await api(BASE, "POST", "/api/exec-sync", { agent_id: "", cmd: "cmd /c exit 5", timeout: 20 }, TOKEN);
     ok("SELF 透传退出码 5", ec.status === 200 && ec.json.result.exit_code === 5);
+    // SELF 真机实跑 .bat（type:run）与 cmd 类型
+    const batPath = path.join(os.tmpdir(), "dao_ext_selftest_" + Date.now() + ".bat");
+    fs.writeFileSync(batPath, "@echo off\r\necho dao-ext-bat %1\r\nexit /b 4\r\n");
+    const batRun = await api(BASE, "POST", "/api/exec-sync", { agent_id: "", type: "run", file: batPath, args: ["E2E"], timeout: 25 }, TOKEN);
+    ok("SELF 实跑 .bat（type:run，stdout + 原生退出码4）", batRun.status === 200 && batRun.json.result.stdout.includes("dao-ext-bat E2E") && batRun.json.result.exit_code === 4);
+    try { fs.unlinkSync(batPath); } catch {}
+    const cmdRun = await api(BASE, "POST", "/api/exec-sync", { agent_id: "", type: "cmd", cmd: "echo cmd-ext-ok", timeout: 20 }, TOKEN);
+    ok("SELF cmd 类型经 cmd.exe 执行", cmdRun.status === 200 && cmdRun.json.result.stdout.includes("cmd-ext-ok"));
   } else {
     const s = await api(BASE, "POST", "/api/exec-sync", { agent_id: "", cmd: "echo self-ok", timeout: 20 }, TOKEN);
     ok("SELF 在中枢本机执行", s.status === 200 && s.json.result.stdout.includes("self-ok"));
