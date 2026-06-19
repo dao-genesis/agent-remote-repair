@@ -11,7 +11,7 @@
 //     → 中枢(本模块 + 隧道，唯一公网入口)
 //       → 被控端(任意机器，一行 PowerShell：irm <hub>/api/bootstrap.ps1 | iex)
 //
-// 纯 Node + stdlib（relay 桥可选依赖 ws）。无 vscode 依赖 → 独立后端与
+// 纯 Node + stdlib。无 vscode 依赖 → 独立后端与
 // 任意宿主（含未来 VSIX）共用本源。
 // ═══════════════════════════════════════════════════════════
 
@@ -170,7 +170,7 @@ class Hub {
     addAliases(safeJson(process.env.DAO_ALIASES));
     addAliases(opts.aliases);
     this.HEARTBEAT_TIMEOUT = 120 * 1000;
-    this.POLL_MAX = 28; // < cloudflared/relay 单连超时，留余量
+    this.POLL_MAX = 28; // < cloudflared 单连超时，留余量
   }
 
   resolveAlias(name) {
@@ -334,7 +334,7 @@ function safeJson(s) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 统一路由 — HTTP 直连与 relay 信封共用
+// 统一路由 — HTTP 透明反代直连
 // ═══════════════════════════════════════════════════════════
 
 async function handleRoute(hub, route, method, headers, query, bodyRaw) {
@@ -730,83 +730,4 @@ async function startServer(hub, opts) {
   return { port, close: () => server.close() };
 }
 
-// ═══════════════════════════════════════════════════════════
-// 出站 relay 桥（可选：Worker+DurableObject，稳定 *.workers.dev）
-// 默认走 cloudflared 透明隧道；relay 为信封模式备援。
-// ═══════════════════════════════════════════════════════════
-
-function connectRelay(hub, opts) {
-  let WebSocket;
-  try {
-    WebSocket = require("ws");
-  } catch {
-    return { isConnected: () => false, stop: () => {} };
-  }
-  let sock = null;
-  let connected = false;
-  let stopped = false;
-  const base = opts.relayUrl.replace(/\/$/, "");
-  const wsUrl = base.replace(/^http/, "ws") + "/connect?session=" + encodeURIComponent(opts.sessionId) + "&token=" + encodeURIComponent(opts.token);
-  function open() {
-    if (stopped) return;
-    try {
-      sock = new WebSocket(wsUrl);
-    } catch {
-      return schedule();
-    }
-    sock.on("open", () => {
-      connected = true;
-      hub.publicUrl = base + "/relay/" + opts.sessionId;
-    });
-    sock.on("message", async (data) => {
-      let m;
-      try {
-        m = JSON.parse(data.toString());
-      } catch {
-        return;
-      }
-      if (m.type === "ping" || m.type === "pong") return;
-      if (m.type === "request" && m.id) {
-        const u = new URL((m.path || "/api/health"), "http://x");
-        const query = Object.fromEntries(u.searchParams.entries());
-        const fwd = Object.assign({}, m.headers || {}, { authorization: "Bearer " + hub.token });
-        const out = await handleRoute(hub, u.pathname, m.method || "GET", fwd, query, typeof m.body === "string" ? m.body : JSON.stringify(m.body || {}));
-        try {
-          sock.send(JSON.stringify({ type: "response", id: m.id, status: out.status, body: out.raw != null ? out.raw : out.body }));
-        } catch {}
-      }
-    });
-    sock.on("close", () => {
-      connected = false;
-      schedule();
-    });
-    sock.on("error", () => {
-      try {
-        sock.close();
-      } catch {}
-    });
-  }
-  let timer = null;
-  function schedule() {
-    if (stopped) return;
-    clearTimeout(timer);
-    timer = setTimeout(open, 3000);
-  }
-  open();
-  setInterval(() => {
-    if (connected) try {
-      sock.send(JSON.stringify({ type: "ping" }));
-    } catch {}
-  }, 15000);
-  return {
-    isConnected: () => connected,
-    stop: () => {
-      stopped = true;
-      try {
-        sock.close();
-      } catch {}
-    },
-  };
-}
-
-module.exports = { Hub, handleRoute, startServer, connectRelay, buildBootstrap, buildBootstrapSh, platformOf, buildCloudDoc, runShell, buildExecCommand, findAvailablePort };
+module.exports = { Hub, handleRoute, startServer, buildBootstrap, buildBootstrapSh, platformOf, buildCloudDoc, runShell, buildExecCommand, findAvailablePort };
