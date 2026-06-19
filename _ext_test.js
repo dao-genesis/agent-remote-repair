@@ -170,6 +170,9 @@ function api(base, method, p, body, token) {
   ok("html 含本源·导出接入文档模块", /导出接入文档/.test(html));
   ok("html 含本源·能力自测模块", /能力自测/.test(html));
   ok("html 含演化·在线设备模块 + 复制按钮", /在线设备 · 汇入中枢/.test(html) && /copyBootstrap/.test(html));
+  ok("html 顶部三按钮(复制 copyAll + 重启 + 刷新Token·无独立 copyUrl/copyToken)", /data-op="copyAll"/.test(html) && /data-op="restart"/.test(html) && /data-op="refreshToken"/.test(html) && !/data-op="copyUrl"/.test(html) && !/data-op="copyToken"/.test(html));
+  await provider.handle({ op: "copyAll" });
+  ok("copyAll 一键复制 URL+Token(含 Authorization 头)", clipboard._v.includes(bridge.url) && clipboard._v.includes(bridge.srv.token) && /Authorization: Bearer/.test(clipboard._v));
 
   // ── state() / cloud MD：设备清单 + 一行接入指令 ──
   const st = bridge.state();
